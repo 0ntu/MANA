@@ -40,6 +40,7 @@ def validate_auth_user(authorization: str = Header(default="")) -> dict: #intake
   
   return user
 
+#hashing passwords
 def hash_password(password: str) -> str:
   return hashingUtil.hash(password)
 
