@@ -18,10 +18,6 @@ from datetime import datetime, timezone
 router = APIRouter()
 #status checks
 
-def make_formatted_energylog(log: dict) -> dict:
-
-def make_formatted_task(log: dict) -> dict:
-
 
 #authentication
 @router.post("/authentication/signup", status_code=status.HTTP_201_CREATED)
@@ -65,9 +61,37 @@ def get_dashboard_summary(current_user: dict = Depends(validate_auth_user)):
 
 
 #energy
+def make_formatted_energylog(log: dict) -> dict:
+  if (log.get("task_id")):
+    return {"id": str(log["_id"]), "energy_level": float(log["energy_level"]), "timestamp": log["timestamp"].isoformat(), "source": log.get("source", "manual"), "task_id": str(log["task_id"])}
+  else
+    return {"id": str(log["_id"]), "energy_level": float(log["energy_level"]), "timestamp": log["timestamp"].isoformat(), "source": log.get("source", "manual"), "task_id": None}
+  
+@router.post("/energy/log")
+def log_energy(payload: EnergyLogCreate_model, current_user: dict = Depends(validate_auth_user)):
+  time = datetime.now(timezone.est)
+  energy_log = {"user_id": current_user["_id"], "energy_level": float(payload.energy_level), "timestamp": time}
 
+  database_record = users.insert_one(created_account)
+  users.update_one({"_id": current_user["id"]}, {})
+  energy_entry["_id"] = database_record.inserted_id
+  return make_formatted_energylog(energy_entry)
+
+#will use for graph sprint 2
+#@router.post("/energy/loghistory")
 
 #tasks
+def make_formatted_tasklog(task: dict) -> dict:
+  if (task.get("completed_at")):
+    return {"id": str(task["_id"]), "status": task["status"]. "title": task["title"], "description": task.get("description", ""), "scheduled_time": task["scheduled_time"].isoformat(), "estimated_energy_cost": float(task["estimated_energy_cost"]), "created_timestamp": task["created_timestamp"].isoformat(), "update_timestamp": task["update_timestamp"].isoformat(), "completed_timestamp": task["completed_timestamp"].isoformat()}
+  else
+    return {"id": str(task["_id"]), "status": task["status"]. "title": task["title"], "description": task.get("description", ""), "scheduled_time": task["scheduled_time"].isoformat(), "estimated_energy_cost": float(task["estimated_energy_cost"]), "created_timestamp": task["created_timestamp"].isoformat(), "update_timestamp": task["update_timestamp"].isoformat(), "completed_timestamp": None}
 
+
+def add_task
+def list_tasks
+def update_task
+def delete_task
+def finish_task   
 
   
