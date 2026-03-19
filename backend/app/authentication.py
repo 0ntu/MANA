@@ -14,7 +14,7 @@ def make_formatted_userdata(user:dict) -> dict: #user docs
 jwt_hashing = "asdf4739vnsjakfbcxvy3685474" #this should be a env var in a realistic environment (secret hashing key) maybe we do for sprint2
 
 def create_jwt_token(subject: str) -> str: #and encode
-  payload = {"sub": subject};
+  payload = {"sub": subject}
   return jwt.encode(payload, jwt_hashing, algorithm="HS256")
 
 def decode_jwt_token(token: str):
@@ -44,5 +44,5 @@ def validate_auth_user(authorization: str = Header(default="")) -> dict: #intake
 def hash_password(password: str) -> str:
   return hashingUtil.hash(password)
 
-def check_hashed_password(password: str, hash_pass: str) -> bool;
+def check_hashed_password(password: str, hash_pass: str) -> bool:
   return hashingUtil.verify(password, hash_pass)
