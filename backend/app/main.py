@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 import os
 
-app = FastAPI(title="")
+app = FastAPI(title="UF MANA API")
 
 
 @app.get("/")
