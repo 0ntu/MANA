@@ -1,16 +1,8 @@
 #communication to the frontend requests
-"""
-API ROUTES
-
-This file defines the main FastAPI endpoints used.
-It connects the Streamlit frontend to the MongoDB database and handles
-core features such as authentication, energy logging, task management,
-and dashboard calculations.
-"""
-
 from datetime import datetime, timezone
-
+from zoneinfo import ZoneInfo
 from bson import ObjectId
+
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.authentication import (
@@ -29,6 +21,7 @@ from app.fastapi_models import (
     UserSignup_model,
 )
 
+est = ZoneInfo("America/New_York")
 router = APIRouter()
 #status checks
 
@@ -37,18 +30,18 @@ router = APIRouter()
 @router.post("/authentication/signup", status_code=status.HTTP_201_CREATED)
 def signup(payload: UserSignup_model):
     if users.find_one({"username": payload.username.strip()}):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already exists",
-        )
-
-    now = datetime.now(timezone.utc)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists")
+    
+    username = payload.username.strip()
+    password = payload.password
     created_account = {
-        "username": payload.username.strip(),
-        "hashed_pass": hash_password(payload.password),
-        "created_at": now,
+        "username": username,
+        "hashed_pass": hash_password(password),
+        "created_time": datetime.now(est),
         "current_energy": 0.0,
     }
+    if not username or not password:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No username or password.")
 
     record = users.insert_one(created_account)
     user_doc = users.find_one({"_id": record.inserted_id})
@@ -65,23 +58,16 @@ def signup(payload: UserSignup_model):
 def login(payload: UserLogin_model):
     user = users.find_one({"username": payload.username.strip()})
     if not user or not check_hashed_password(payload.password, user["hashed_pass"]):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid username or password",
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
 
     jwt_token = create_jwt_token(str(user["_id"]))
-    return {
-        "access_token": jwt_token,
-        "token_type": "bearer",
-        "user": make_formatted_userdata(user),
-    }
+    return {"access_token": jwt_token, "token_type": "bearer", "user": make_formatted_userdata(user)}
 
 
 #dashboard
 @router.get("/dashboard/summary")
 def get_dashboard_summary(current_user: dict = Depends(validate_auth_user)):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(est)
     day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     day_end = now.replace(hour=23, minute=59, second=59, microsecond=999999)
 
@@ -89,7 +75,7 @@ def get_dashboard_summary(current_user: dict = Depends(validate_auth_user)):
         tasks.find({
             "user_id": current_user["_id"],
             "status": "planned",
-            "scheduled_time": {"$gte": day_start, "$lte": day_end},
+            "scheduled_time": {"$gt": now, "$lte": day_end}, #will only consider tasks upcoming not completed
         })
     )
 
@@ -124,22 +110,18 @@ def _fmt_energy_log(log: dict) -> dict:
     return {
         "id": str(log["_id"]),
         "energy_level": float(log["energy_level"]),
-        "timestamp": log["timestamp"].isoformat(),
+        "created_time": log["created_time"].isoformat(),
         "source": log.get("source", "manual"),
         "task_id": str(log["task_id"]) if log.get("task_id") else None,
     }
 
 
 @router.post("/energy/log")
-def log_energy(
-    payload: EnergyLogCreate_model,
-    current_user: dict = Depends(validate_auth_user),
-):
-    now = datetime.now(timezone.utc)
+def log_energy(payload: EnergyLogCreate_model, current_user: dict = Depends(validate_auth_user)):
     energy_entry = {
         "user_id": current_user["_id"],
         "energy_level": float(payload.energy_level),
-        "timestamp": now,
+        "created_time": datetime.now(est),
         "source": "manual",
     }
 
@@ -164,9 +146,9 @@ def _fmt_task(task: dict) -> dict:
         "description": task.get("description", ""),
         "scheduled_time": task["scheduled_time"].isoformat(),
         "energy_cost": float(task.get("energy_cost", 0)),
-        "created_at": task["created_at"].isoformat(),
-        "updated_at": task["updated_at"].isoformat(),
-        "completed_at": task["completed_at"].isoformat() if task.get("completed_at") else None,
+        "created_time": task["created_time"].isoformat() if task.get("created_time") else None,
+        "updated_time": task["updated_time"].isoformat() if task.get("updated_time") else None,
+        "completed_time": task["completed_time"].isoformat() if task.get("completed_time") else None,
     }
 
 
@@ -175,17 +157,16 @@ def add_task(
     payload: TaskCreate_model,
     current_user: dict = Depends(validate_auth_user),
 ):
-    now = datetime.now(timezone.utc)
     task = {
         "user_id": current_user["_id"],
-        "title": payload.title,
-        "description": payload.description,
+        "title": payload.title.strip(),
+        "description": payload.description.strip(),
         "scheduled_time": payload.scheduled_time,
         "energy_cost": float(payload.energy_cost),
         "status": "planned",
-        "created_at": now,
-        "updated_at": now,
-        "completed_at": None,
+        "created_time": datetime.now(est),
+        "updated_time": None,
+        "completed_time": None,
     }
     record = tasks.insert_one(task)
     task["_id"] = record.inserted_id
@@ -194,9 +175,11 @@ def add_task(
 
 @router.get("/tasks")
 def list_tasks(current_user: dict = Depends(validate_auth_user)):
+    #planned_tasks = list(tasks.find({"status": "planned", "user_id": current_user["_id"]}))
+    #completed_tasks = list(tasks.find({"status": "completed", "user_id": current_user["_id"]}))
     user_tasks = list(tasks.find({"user_id": current_user["_id"]}))
-    return [_fmt_task(t) for t in user_tasks]
-
+    #return {"planned": [_fmt_task(t) for t in planned_tasks], "completed": [_fmt_task(t) for t in completed_tasks], "all": [_fmt_task(t) for t in all_user_tasks]}
+    return {[_fmt_task(t) for t in user_tasks]}
 
 @router.patch("/tasks/{task_id}")
 def update_task(
@@ -211,7 +194,7 @@ def update_task(
     if not updates:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No fields to update")
 
-    updates["updated_at"] = datetime.now(timezone.utc)
+    updates["updated_time"] = datetime.now(est)
     result = tasks.update_one(
         {"_id": ObjectId(task_id), "user_id": current_user["_id"]},
         {"$set": updates},
@@ -238,13 +221,15 @@ def finish_task(task_id: str, current_user: dict = Depends(validate_auth_user)):
     if not ObjectId.is_valid(task_id):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid task ID")
 
-    now = datetime.now(timezone.utc)
-    result = tasks.update_one(
+    database_log = tasks.update_one(
         {"_id": ObjectId(task_id), "user_id": current_user["_id"]},
-        {"$set": {"status": "completed", "completed_at": now, "updated_at": now}},
+        {"$set": {"status": "completed", "completed_time": datetime.now(est), "updated_time": datetime.now(est)}},
     )
-    if result.matched_count == 0:
+    if database_log.matched_count == 0:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
 
     updated = tasks.find_one({"_id": ObjectId(task_id)})
     return _fmt_task(updated)
+
+
+
