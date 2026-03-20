@@ -87,11 +87,73 @@ def make_formatted_tasklog(task: dict) -> dict:
   else
     return {"id": str(task["_id"]), "status": task["status"]. "title": task["title"], "description": task.get("description", ""), "scheduled_time": task["scheduled_time"].isoformat(), "estimated_energy_cost": float(task["estimated_energy_cost"]), "created_timestamp": task["created_timestamp"].isoformat(), "update_timestamp": task["update_timestamp"].isoformat(), "completed_timestamp": None}
 
+@router.post("/tasks", status_code=status.HTTP_201_CREATED)
+def add_task(payload: AddTask, current_user: dict = Depends(validate_auth_user) :
+  task_log = {"user_id": current_user["_id"], "title": payload.title.strip(), "description": payload.description.strip(), "status": "planned", "scheduled_time": est_convert(payload.timestamp), "estimated_energy_cost": float(payload.estimated_energy_cost), "created_timestamp": datetime.now(timezone.est), "updated_timestamp": None, "completed_timestamp": None}
+ 
+  database_record = tasks.insert_one(task_log)
+  task_log["_id"] = database_record.inserted_id
+  return make_formatted_tasklog(task_log)
 
-def add_task
-def list_tasks
-def update_task
-def delete_task
-def finish_task   
+@router.put("/tasks/{task_id}")
+def update_task(task_id: str, current_user: dict = Depends(validate_auth_user), payload: TaskUpdate):
+  grabbedTask = tasks.find_one({"_id": ObjectId(task_id), "user_id": current_user["_id"]}
+  if not (grabbedTask):
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, description="No task found.")
+  if not (grabbedTask["status"] == "planned"):
+    raise HTTPException(status_code=status.HTTP_404_BAD_REQUEST, description="Task is not planned.")
+
+  dataToUpdate = {}
+  if (payload.title != None):
+    dataToUpdate["title"] = payload.title.strip()
+  if (payload.description != None):
+    dataToUpdate["description"] = payload.description.strip()
+  if (payload.scheduled_time != None):
+    dataToUpdate["scheduled_time"] = payload.scheduled_time.strip()
+  if (payload.estimated_energy_cost != None):
+    dataToUpdate["estimated_energy_cost"] = payload.estimated_energy_cost.strip()
+  if (update_data == {}):
+    raise HTTPException(status_code=status.HTTP_404_BAD_REQUEST, description="No data given to update.")
+
+  dataToUpdate["updated_timestamp"] = datetime.now(timezone.est)
+  tasks.update_one({"_id": existing_task["_id"]}, {"$set": dataToUpdate})
+  return make_formatted_task(tasks.find_one({"_id": grabbedTask["_id"]}))
+
+@router.patch("/tasks/{task_id}/completed")
+def finish_task(task_id: str, current_user: dict = Depends(validate_auth_user)):
+  grabbedTask = tasks.find_one({"_id": ObjectId(task_id), "user_id": current_user["_id"]}
+  if not (grabbedTask):
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, description="No task found.")
+  if not (grabbedTask["status"] == "planned"):
+    raise HTTPException(status_code=status.HTTP_404_BAD_REQUEST, description="Task is not planned.")
+
+  current_energy = float(current_user.get("current_energy", 0.0))
+  est_task_cost = float(existing_task["estimated_energy_cost"])
+  user_energy = max(0.0, current_energy - est_task_cost)
+  users.update_one({"_id": current_user["_id"]}, {"$set": {"current_energy": user_energy}})
+  
+  tasks.update_one({"_id": existing_task["_id"]}, {"status": "completed"}, {"completed_timestamp": datetime.now(timezone.utc)})
+  energy_logs.insert_one({"user_id": current_user["_id"], "energy_level": user_energy, "task_id": grabbedTask["_id"], "recorded_timestamp":  datetime.now(timezone.utc), "source": "task_completed"})
+  return {}
+
+@router.get("/tasks")
+def list_tasks(current_user: dict = Depends(validate_auth_user)):
+  planned_tasks = tasks.find({"status": "planned", "user_id": current_user["_id"]}).sort("scheduled_time", 1)
+  completed_tasks = tasks.find({"status": "completed", "user_id": current_user["_id"]}).sort("completed_time", 1)
+  for (task in planned_tasks):
+    make_formatted_tasklog(task)
+  for (task in completed_tasks):
+    make_formatted_tasklog(task)
+  return {}
+
+@router.delete("/tasks/{task_id}")
+def delete_task(task_id: str, current_user: dict = Depends(validate_auth_user)):
+  delete_record = tasks.delete_one({"_id": ObjectId(task_id), "user_id": current_user["_id"]})
+  if (delete_record.deleted_count == 0):
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, description="No task found and/or bad deletion.")
+  return {"log": "Deletion complete"} #add task name?
 
   
+
+
+
