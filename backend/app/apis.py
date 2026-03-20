@@ -179,7 +179,7 @@ def list_tasks(current_user: dict = Depends(validate_auth_user)):
     #completed_tasks = list(tasks.find({"status": "completed", "user_id": current_user["_id"]}))
     user_tasks = list(tasks.find({"user_id": current_user["_id"]}))
     #return {"planned": [_fmt_task(t) for t in planned_tasks], "completed": [_fmt_task(t) for t in completed_tasks], "all": [_fmt_task(t) for t in all_user_tasks]}
-    return {[_fmt_task(t) for t in user_tasks]}
+    return {"tasks": [_fmt_task(t) for t in user_tasks]}
 
 @router.patch("/tasks/{task_id}")
 def update_task(
