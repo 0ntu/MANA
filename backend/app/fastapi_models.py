@@ -24,6 +24,7 @@ class TaskCreate_model(BaseModel):
 
 class TaskUpdate_model(BaseModel):
     title: Optional[str] = None
+    description: Optional[str] = None
     scheduled_time: Optional[datetime] = None
     energy_cost: Optional[float] = None
 
