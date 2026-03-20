@@ -31,7 +31,7 @@ def get_tasks(token: str) -> list[dict]:
 
     if resp.status_code >= 400:
         raise RuntimeError(data.get("detail") or "Failed to fetch tasks")
-    return data
+    return data.get("tasks", data) if isinstance(data, dict) else data
 
 
 # mark a task as completed
