@@ -18,7 +18,7 @@ def make_formatted_userdata(user: dict) -> dict:
         "id": str(user["_id"]),
         "username": user["username"],
         "current_energy": float(user.get("current_energy", 0.0)),
-        "timestamp": user["timestamp"].isoformat() if user.get("timestamp") else None,
+        "created_time": user["created_time"].isoformat() if user.get("timestamp") else None,
     }
 
 # insecure lmao lolololol
