@@ -13,6 +13,6 @@ tasks = database["tasks"]
 
 def initialize_indexes() -> None:
     users.create_index([("username", ASCENDING)], unique=True)
-    energy_logs.create_index([("user_id", ASCENDING), ("timestamp", DESCENDING)])
+    energy_logs.create_index([("user_id", ASCENDING), ("created_time", DESCENDING)])
     tasks.create_index([("user_id", ASCENDING), ("scheduled_time", ASCENDING)])
     tasks.create_index([("user_id", ASCENDING), ("status", ASCENDING)])
