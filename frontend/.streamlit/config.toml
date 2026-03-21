@@ -1,0 +1,23 @@
+[server]
+enableStaticServing = true
+
+[theme]
+# stolen from streamlit templates xd
+primaryColor = "#4a7c59"
+backgroundColor = "#f5f4ef"
+secondaryBackgroundColor = "#eae9e1"
+textColor = "#2d3a2e"
+linkColor = "#4a7c59"
+borderColor = "#d1d0c8"
+showWidgetBorder = true
+baseRadius = "0.6rem"
+font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@300..700&display=swap"
+codeFont = "Fira Code:https://fonts.googleapis.com/css2?family=Fira+Code:wght@300..700&display=swap"
+codeBackgroundColor = "#e8e7df"
+showSidebarBorder = true
+headingFontSizes = ["40px", "32px", "24px"]
+headingFontWeights = 500
+
+[theme.sidebar]
+backgroundColor = "#e5e4dc"
+secondaryBackgroundColor = "#eae9e1"
