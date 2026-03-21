@@ -1,6 +1,6 @@
 # UF MANA
 
-An energy-aware scheduling web application for University of Florida students.
+An energy-aware scheduling web application for students prone to burnout.
 
 ## Tech Stack
 
