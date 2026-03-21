@@ -3,8 +3,6 @@ from datetime import datetime, timezone
 
 from services.event_service import get_tasks, finish_task
 
-st.set_page_config(page_title="Today's Schedule — UF MANA", page_icon=":robot_face:", layout="centered")
-
 token = st.session_state.get("token")
 if not token:
     st.warning("Please sign up / log in first.")
