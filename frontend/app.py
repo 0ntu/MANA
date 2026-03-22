@@ -47,6 +47,7 @@ if token and user:
         ],
         "Tasks": [
             st.Page(APP_DIR / "views" / "schedule_today.py", title="Today's Schedule", icon=":material/today:"),
+            st.Page(APP_DIR / "views" / "calendar.py", title="Monthly Overview", icon=":material/calendar_month:"),
             st.Page(APP_DIR / "views" / "add_event.py", title="Add Task", icon=":material/add_task:"),
         ],
         "Energy": [
