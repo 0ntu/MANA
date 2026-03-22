@@ -1,23 +1,25 @@
-USE_MOCK = True
+import requests
 
-MOCK_MANA = {"current": 7.0, "max": 10.0, "status": "Good"}
+from services.auth_service import BACKEND_URL, build_auth_headers
 
-MOCK_HISTORY = [
-    {"id": "1", "energy_level": 8.0, "timestamp": "2024-03-13T09:00:00", "source": "manual"},
-    {"id": "2", "energy_level": 5.0, "timestamp": "2024-03-13T13:00:00", "source": "manual"},
-    {"id": "3", "energy_level": 3.0, "timestamp": "2024-03-13T18:00:00", "source": "manual"},
-]
 
-def get_mana_level(user_id):
-    if USE_MOCK:
-        return MOCK_MANA
+def log_energy(token: str, energy_level: float) -> dict:
+    """
+    Logs a mana/energy entry via backend POST `/energy/log`.
+    """
+    url = f"{BACKEND_URL}/energy/log"
+    resp = requests.post(
+        url,
+        json={"energy_level": float(energy_level)},
+        headers=build_auth_headers(token),
+        timeout=20,
+    )
+    try:
+        data = resp.json()
+    except Exception:
+        data = {"detail": resp.text}
 
-def log_mana(user_id, level: float):
-    if USE_MOCK:
-        entry = {"id": str(len(MOCK_HISTORY) + 1), "energy_level": float(level), "timestamp": "now", "source": "manual"}
-        MOCK_HISTORY.append(entry)
-        return entry
+    if resp.status_code >= 400:
+        raise RuntimeError(data.get("detail") or "Failed to log energy")
+    return data
 
-def get_mana_history(user_id):
-    if USE_MOCK:
-        return MOCK_HISTORY

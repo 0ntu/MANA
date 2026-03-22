@@ -1,34 +1,49 @@
-USE_MOCK = True
-from datetime import datetime
+import requests
 
-MOCK_EVENTS = [
-    {"id": "1", "title": "CEN3031 Lecture", "description": "Weekly lecture", "scheduled_time": "2024-03-11T10:00:00", "energy_cost": 3.0, "status": "planned"},
-    {"id": "2", "title": "Soccer Practice", "description": "Team practice", "scheduled_time": "2024-03-12T15:00:00", "energy_cost": 5.0, "status": "planned"},
-    {"id": "3", "title": "Study Group", "description": "", "scheduled_time": "2024-03-13T18:00:00", "energy_cost": 2.0, "status": "completed"},
-]
+from services.auth_service import BACKEND_URL, build_auth_headers
 
-def get_events(user_id):
-    if USE_MOCK:
-        return MOCK_EVENTS
 
-def add_event(user_id, event):
-    if USE_MOCK:
-        event["id"] = str(len(MOCK_EVENTS) + 1)
-        event["status"] = "planned"
-        MOCK_EVENTS.append(event)
-        return event
-   
+def add_event(token: str, payload: dict) -> dict:
+    """
+    Creates a scheduled task/event via backend POST `/tasks/create`.
+    Payload is expected to align with backend's CreateTask model.
+    """
+    url = f"{BACKEND_URL}/tasks/create"
+    resp = requests.post(url, json=payload, headers=build_auth_headers(token), timeout=20)
+    try:
+        data = resp.json()
+    except Exception:
+        data = {"detail": resp.text}
 
-def update_event(event_id, updated_fields):
-    if USE_MOCK:
-        for e in MOCK_EVENTS:
-            if e["id"] == event_id:
-                e.update(updated_fields)
-                return e
-    
-def delete_event(event_id):
-    if USE_MOCK:
-        global MOCK_EVENTS
-        MOCK_EVENTS = [e for e in MOCK_EVENTS if e["id"] != event_id]
-        return True
-    
+    if resp.status_code >= 400:
+        raise RuntimeError(data.get("detail") or "Failed to add event")
+    return data
+
+
+# fetch the tasks for the current user
+def get_tasks(token: str) -> list[dict]:
+    url = f"{BACKEND_URL}/tasks"
+    resp = requests.get(url, headers=build_auth_headers(token), timeout=20)
+    try:
+        data = resp.json()
+    except Exception:
+        data = {"detail": resp.text}
+
+    if resp.status_code >= 400:
+        raise RuntimeError(data.get("detail") or "Failed to fetch tasks")
+    return data.get("tasks", data) if isinstance(data, dict) else data
+
+
+# mark a task as completed
+def finish_task(token: str, task_id: str) -> dict:
+    url = f"{BACKEND_URL}/tasks/{task_id}/finish"
+    resp = requests.post(url, headers=build_auth_headers(token), timeout=20)
+    try:
+        data = resp.json()
+    except Exception:
+        data = {"detail": resp.text}
+
+    if resp.status_code >= 400:
+        raise RuntimeError(data.get("detail") or "Failed to finish task")
+    return data
+

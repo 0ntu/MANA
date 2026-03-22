@@ -1,13 +1,67 @@
-#we can set mock to false when we have the real users
-USE_MOCK = True
+import os
+from typing import Any, Optional, Tuple
 
-def login(username, password):
-    if USE_MOCK:
-        mock_users = {"student1": "pass123", "athlete1": "pass456"}
-        return mock_users.get(username) == password
-    # TODO: POST /auth/login
+import requests
 
-def get_current_user():
-    if USE_MOCK:
-        return {"id": "u1", "name": "Alex", "role": "student", "mana": 7}
-    # TODO: GET /users/me
+
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000").rstrip("/")
+
+
+def _auth_headers(token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}"}
+
+
+def _extract_token_and_user(payload: dict[str, Any]) -> Tuple[Optional[str], Optional[dict[str, Any]]]:
+    token = payload.get("access_token") or payload.get("jwt_token") or payload.get("token")
+    user = payload.get("user") or payload.get("current_user")
+    return token, user
+
+
+def signup(username: str, password: str) -> tuple[str, dict[str, Any]]:
+    """
+    Calls backend POST `/authentication/signup`.
+    Returns `(token, user)`.
+    """
+    url = f"{BACKEND_URL}/authentication/signup"
+    resp = requests.post(url, json={"username": username, "password": password}, timeout=20)
+    try:
+        data = resp.json()
+    except Exception:
+        data = {"detail": resp.text}
+
+    if resp.status_code >= 400:
+        raise RuntimeError(data.get("detail") or "Signup failed")
+
+    token, user = _extract_token_and_user(data)
+    if not token:
+        raise RuntimeError("Signup succeeded but no token was returned by backend")
+    return token, user or {}
+
+
+def login(username: str, password: str) -> tuple[str, dict[str, Any]]:
+    """
+    Calls backend POST `/authentication/login`.
+    Returns `(token, user)`.
+    """
+    url = f"{BACKEND_URL}/authentication/login"
+    resp = requests.post(url, json={"username": username, "password": password}, timeout=20)
+    try:
+        data = resp.json()
+    except Exception:
+        data = {"detail": resp.text}
+
+    if resp.status_code >= 400:
+        raise RuntimeError(data.get("detail") or "Login failed")
+
+    token, user = _extract_token_and_user(data)
+    if not token:
+        raise RuntimeError("Login succeeded but no token was returned by backend")
+    return token, user or {}
+
+
+def get_backend_url() -> str:
+    return BACKEND_URL
+
+
+def build_auth_headers(token: str) -> dict[str, str]:
+    return _auth_headers(token)

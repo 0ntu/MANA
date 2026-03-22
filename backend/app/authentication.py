@@ -1,48 +1,70 @@
-#auth 
+# Auth utilities: password hashing and JWT creation/validation
+import hashlib
+
 from app.database import users
-from fastapi import Header, HTTPException, status #handle auth http requests
-from bson import ObjectId  #get jwt tokens for the user ids
-from jose import jwt, JWTError #jwt handles and api for keeping logged in
-from passlib.context import CryptContext #hashing
+from fastapi import Header, HTTPException, status
+from bson import ObjectId
+from jose import jwt, JWTError
+from passlib.context import CryptContext
 
-hashingUtil = CryptContext(schemes=["bcrypt"], deprecated="auto") #hash pass during signup and validate login
+hashingUtil = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-def make_formatted_userdata(user:dict) -> dict: #user docs
-  return{"id": str(user["_id"]), "username": user["username"], "current_energy": float(user.get("current_energy", 0.0)), "timestamp": user["created_at"].isoformat()}
+def _prepare_password(password: str) -> str:
+    """SHA-256 pre-hash before bcrypt to bypass the 72-byte bcrypt limit."""
+    return hashlib.sha256(password.encode()).hexdigest()
 
+def make_formatted_userdata(user: dict) -> dict:
+    return {
+        "id": str(user["_id"]),
+        "username": user["username"],
+        "current_energy": float(user.get("current_energy", 0.0)),
+        "created_time": user["created_time"].isoformat() if user.get("created_time") else None,
+    }
 
-jwt_hashing = "asdf4739vnsjakfbcxvy3685474" #this should be a env var in a realistic environment (secret hashing key) maybe we do for sprint2
+# insecure lmao lolololol
+jwt_secret = "asdf4739vnsjakfbcxvy3685474"
 
-def create_jwt_token(subject: str) -> str: #and encode
-  payload = {"sub": subject}
-  return jwt.encode(payload, jwt_hashing, algorithm="HS256")
+def create_jwt_token(subject: str) -> str:
+    payload = {"sub": subject}
+    return jwt.encode(payload, jwt_secret, algorithm="HS256")
+
 
 def decode_jwt_token(token: str):
-  try:
-    payload = jwt.decode(token, jwt_hashing, algorithms=["HS256"])
-    return payload.get("sub")
-  except JWTError:
-    return None
+    try:
+        payload = jwt.decode(token, jwt_secret, algorithms=["HS256"])
+        return payload.get("sub")
+    except JWTError:
+        return None
 
-#actual check got framework but goign to bed quick done tom
-def validate_auth_user(authorization: str = Header(default="")) -> dict: #intake fastapi HTTP header of auth from frontend request
-  if (not authorization.startswith("Bearer ")):  #formatted as Authorization: Bearer (auth code)
-    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="no authorization header in request")
-  
-  token = authorization.split(" ", 1)[1].strip() #grab token from header
-  userID = decode_jwt_token(token)
-  if (not ObjectId.is_valid(userID) or userID == ""):
-    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="decode token error, bad userID")
-  
-  user = users.find_one({"_id": ObjectId(userID)})
-  if (not user):
-    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="no user found")
-  
-  return user
 
-#hashing passwords
+def validate_auth_user(authorization: str = Header(default="")) -> dict:
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No authorization header in request",
+        )
+
+    token = authorization.split(" ", 1)[1].strip()
+    user_id = decode_jwt_token(token)
+
+    if not user_id or not ObjectId.is_valid(user_id):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+        )
+
+    user = users.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+        )
+
+    return user
+
+
 def hash_password(password: str) -> str:
-  return hashingUtil.hash(password)
+    return hashingUtil.hash(_prepare_password(password))
 
-def check_hashed_password(password: str, hash_pass: str) -> bool:
-  return hashingUtil.verify(password, hash_pass)
+def check_hashed_password(password: str, hashed: str) -> bool:
+    return hashingUtil.verify(_prepare_password(password), hashed)
