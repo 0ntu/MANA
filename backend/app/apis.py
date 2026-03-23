@@ -13,6 +13,7 @@ from app.authentication import (
     validate_auth_user,
 )
 from app.database import energy_logs, tasks, users
+from app.mana_engine import run_mana_engine
 from app.fastapi_models import (
     EnergyLogCreate_model,
     TaskCreate_model,
@@ -96,6 +97,13 @@ def get_dashboard_summary(current_user: dict = Depends(validate_auth_user)):
         "status": "completed",
     })
 
+    mana_extra = run_mana_engine(
+        current_energy,
+        remaining_today_energy_cost,
+        estimated_end_of_day_energy,
+        remaining_today_tasks,
+    )
+
     return {
         "current_energy": current_energy,
         "remaining_today_energy_cost": remaining_today_energy_cost,
@@ -103,6 +111,7 @@ def get_dashboard_summary(current_user: dict = Depends(validate_auth_user)):
         "planned_tasks_count": planned_tasks_count,
         "completed_tasks_count": completed_tasks_count,
         "remaining_today_tasks_amount": len(remaining_today_tasks),
+        **mana_extra,
     }
 
 

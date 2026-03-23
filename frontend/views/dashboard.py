@@ -36,9 +36,13 @@ planned_tasks_count = int(data.get("planned_tasks_count", 0))
 completed_tasks_count = int(data.get("completed_tasks_count", 0))
 remaining_today_tasks_amount = int(data.get("remaining_today_tasks_amount", 0))
 
+stress = data.get("mana_stress")
+
 st.metric("Current Mana / Energy", f"{current_energy:.1f}")
 st.metric("Planned Energy Cost Today", f"{remaining_cost:.1f}")
 st.metric("Estimated End-of-Day Energy", f"{estimated_end:.1f}")
+if stress is not None:
+    st.metric("Load stress", f"{float(stress):.1f} / 10")
 
 st.subheader("Task Status")
 col1, col2, col3 = st.columns(3)
@@ -46,11 +50,15 @@ col1.metric("Planned Tasks", planned_tasks_count)
 col2.metric("Completed Tasks", completed_tasks_count)
 col3.metric("Remaining Today", remaining_today_tasks_amount)
 
-# Simple heuristic guidance; actual scheduling intelligence can be improved server-side.
-if estimated_end <= 2.0:
-    st.warning("Your plan may leave you drained. Consider moving one task or adding a recovery break.")
+tip = data.get("scheduling_tip")
+if data.get("overload_warning"):
+    st.error("Your planned stuff costs more mana than you have right now.")
+if tip:
+    st.info(tip)
+elif estimated_end <= 2.0:
+    st.warning("Might be rough later today — maybe move something.")
 elif current_energy <= 2.0:
-    st.info("You're starting low. If possible, do a smaller task first, then reassess.")
+    st.info("Starting low — go easy.")
 else:
-    st.success("Your energy budget looks reasonable. Keep an eye on it as your day changes.")
+    st.success("Roughly okay for now.")
 
