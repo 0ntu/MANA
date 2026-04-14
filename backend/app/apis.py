@@ -1,5 +1,5 @@
 #communication to the frontend requests
-from datetime import datetime, timezone
+from datetime import datetime, timezone, time, timedelta
 from zoneinfo import ZoneInfo
 from bson import ObjectId
 
@@ -25,6 +25,9 @@ from app.fastapi_models import (
 est = ZoneInfo("America/New_York")
 router = APIRouter()
 #status checks
+
+
+
 
 
 #authentication
@@ -72,6 +75,47 @@ def get_dashboard_summary(current_user: dict = Depends(validate_auth_user)):
     day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     day_end = now.replace(hour=23, minute=59, second=59, microsecond=999999)
 
+    recurring_templates = list(
+        tasks.find({
+            "user_id": current_user["_id"],
+            "is_recurring": True,
+            "repeat_pattern": "daily",
+            "is_generated_instance": False,
+        })
+    )
+    
+    for template in recurring_templates:
+        og_time = template["scheduled_time"]
+        todays_scheduled_time = datetime.combine(now.date(), time(og_time.hour, og_time.minute, og_time.second,), tzinfo=est,)
+        if todays_scheduled_time < og_time:
+            continue
+
+        existing_instance = tasks.find_one({
+            "user_id": current_user["_id"],
+            "parent_task_id": template["_id"],
+            "is_generated_instance": True,
+            "scheduled_time": {"$gte": day_starttart, "$lte": day_endnd},
+        })
+
+        if not existing_instance:
+            generated_task = {
+                "user_id": current_user["_id"],
+                "title": template["title"],
+                "description": template.get("description", ""),
+                "scheduled_time": todays_scheduled_time,
+                "energy_cost": float(template.get("energy_cost", 0)),
+                "actual_energy_cost": None,
+                "status": "planned",
+                "created_time": datetime.now(est),
+                "updated_time": None,
+                "completed_time": None,
+                "is_recurring": False,
+                "repeat_pattern": None,
+                "parent_task_id": template["_id"],
+                "is_generated_instance": True,
+            }
+            tasks.insert_one(generated_task)
+
     remaining_today_tasks = list(
         tasks.find({
             "user_id": current_user["_id"],
@@ -80,12 +124,12 @@ def get_dashboard_summary(current_user: dict = Depends(validate_auth_user)):
         })
     )
 
-    remaining_today_energy_cost = round(
+    remaining_today_endnergy_cost = round(
         sum(float(t.get("energy_cost", 0)) for t in remaining_today_tasks), 1
     )
     current_energy = round(float(current_user.get("current_energy", 0.0)), 1)
-    estimated_end_of_day_energy = round(
-        max(0.0, current_energy - remaining_today_energy_cost), 1
+    estimated_end_of_day_endnergy = round(
+        max(0.0, current_energy - remaining_today_endnergy_cost), 1
     )
 
     planned_tasks_count = tasks.count_documents({
@@ -99,18 +143,32 @@ def get_dashboard_summary(current_user: dict = Depends(validate_auth_user)):
 
     mana_extra = run_mana_engine(
         current_energy,
-        remaining_today_energy_cost,
-        estimated_end_of_day_energy,
+        remaining_today_endnergy_cost,
+        estimated_end_of_day_endnergy,
         remaining_today_tasks,
     )
-
+    max_energy = 10.0
+    current_energy_percent = round((current_energy / max_energy) * 100.0, 1)
+    estimated_end_energy_percent = round((estimated_end_of_day_endnergy / max_energy) * 100.0, 1)
+    if current_energy <= 2.5:
+        energy_bar_state = "low"
+    elif current_energy <= 6.0:
+        energy_bar_state = "medium"
+    else:
+        energy_bar_state = "high" #low cortisol fr
+        
     return {
         "current_energy": current_energy,
-        "remaining_today_energy_cost": remaining_today_energy_cost,
-        "estimated_end_of_day_energy": estimated_end_of_day_energy,
+        "remaining_today_endnergy_cost": remaining_today_endnergy_cost,
+        "estimated_end_of_day_endnergy": estimated_end_of_day_endnergy,
         "planned_tasks_count": planned_tasks_count,
         "completed_tasks_count": completed_tasks_count,
         "remaining_today_tasks_amount": len(remaining_today_tasks),
+        "energy_bar_state": energy_bar_state,
+        "current_energy_percent": current_energy_percent,
+        "estimated_end_energy_percent": estimated_end_energy_percent,
+        "remaining_today_tasks": [_fmt_task(t) for t in remaining_today_tasks],
+        "max_energy": max_energy,
         **mana_extra,
     }
 
@@ -155,9 +213,18 @@ def _fmt_task(task: dict) -> dict:
         "description": task.get("description", ""),
         "scheduled_time": task["scheduled_time"].isoformat(),
         "energy_cost": float(task.get("energy_cost", 0)),
+        "actual_energy_cost": (
+            float(task["actual_energy_cost"])
+            if task.get("actual_energy_cost") is not None
+            else None
+        ),
         "created_time": task["created_time"].isoformat() if task.get("created_time") else None,
         "updated_time": task["updated_time"].isoformat() if task.get("updated_time") else None,
         "completed_time": task["completed_time"].isoformat() if task.get("completed_time") else None,
+        "is_recurring": bool(task.get("is_recurring", False)),
+        "repeat_pattern": task.get("repeat_pattern"),
+        "parent_task_id": str(task["parent_task_id"]) if task.get("parent_task_id") else None,
+        "is_generated_instance": bool(task.get("is_generated_instance", False)),
     }
 
 
@@ -172,10 +239,15 @@ def add_task(
         "description": payload.description.strip(),
         "scheduled_time": payload.scheduled_time,
         "energy_cost": float(payload.energy_cost),
+        "actual_energy_cost": None,
         "status": "planned",
         "created_time": datetime.now(est),
         "updated_time": None,
         "completed_time": None,
+        "is_recurring": bool(getattr(payload, "is_recurring", False)),
+        "repeat_pattern": getattr(payload, "repeat_pattern", None),
+        "parent_task_id": None,
+        "is_generated_instance": False,
     }
     record = tasks.insert_one(task)
     task["_id"] = record.inserted_id
@@ -186,8 +258,63 @@ def add_task(
 def list_tasks(current_user: dict = Depends(validate_auth_user)):
     #planned_tasks = list(tasks.find({"status": "planned", "user_id": current_user["_id"]}))
     #completed_tasks = list(tasks.find({"status": "completed", "user_id": current_user["_id"]}))
-    user_tasks = list(tasks.find({"user_id": current_user["_id"]}))
+    #user_tasks = list(tasks.find({"user_id": current_user["_id"]}))
     #return {"planned": [_fmt_task(t) for t in planned_tasks], "completed": [_fmt_task(t) for t in completed_tasks], "all": [_fmt_task(t) for t in all_user_tasks]}
+    now = datetime.now(est)
+    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_end = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+    recurring_templates = list(
+        tasks.find({
+            "user_id": current_user["_id"],
+            "is_recurring": True,
+            "repeat_pattern": "daily",
+            "is_generated_instance": False,
+        })
+    )
+    for template in recurring_templates:
+         og_time = template["scheduled_time"]
+        todays_scheduled_time = datetime.combine(
+            now.date(),
+            time(
+                og_time.hour,
+                og_time.minute,
+                og_time.second,
+            ),
+            tzinfo=est,
+        )
+        if todays_scheduled_time < og_time:
+            continue
+            
+        past = tasks.find_one({
+            "user_id": current_user["_id"],
+            "parent_task_id": template["_id"],
+            "is_generated_instance": True,
+            "scheduled_time": {"$gte": day_start, "$lte": day_end},
+        })
+
+        if not past:
+            generated_task = {
+                "user_id": current_user["_id"],
+                "title": template["title"],
+                "description": template.get("description", ""),
+                "scheduled_time": todays_scheduled_time,
+                "energy_cost": float(template.get("energy_cost", 0)),
+                "actual_energy_cost": None,
+                "status": "planned",
+                "created_time": datetime.now(est),
+                "updated_time": None,
+                "completed_time": None,
+                "is_recurring": False,
+                "repeat_pattern": None,
+                "parent_task_id": template["_id"],
+                "is_generated_instance": True,
+            }
+            tasks.insert_one(generated_task)
+
+    user_tasks = list(
+        tasks.find({"user_id": current_user["_id"]}).sort("scheduled_time", 1)
+    )
     return {"tasks": [_fmt_task(t) for t in user_tasks]}
 
 @router.patch("/tasks/{task_id}")
@@ -203,6 +330,12 @@ def update_task(
     if not updates:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No fields to update")
 
+  if "title" in updates:
+        updates["title"] = updates["title"].strip()
+    if "description" in updates:
+        updates["description"] = updates["description"].strip()
+    if updates.get("is_recurring") is False:
+        updates["repeat_pattern"] = None
     updates["updated_time"] = datetime.now(est)
     result = tasks.update_one(
         {"_id": ObjectId(task_id), "user_id": current_user["_id"]},
