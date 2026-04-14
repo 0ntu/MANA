@@ -16,3 +16,6 @@ def initialize_indexes() -> None:
     energy_logs.create_index([("user_id", ASCENDING), ("created_time", DESCENDING)])
     tasks.create_index([("user_id", ASCENDING), ("scheduled_time", ASCENDING)])
     tasks.create_index([("user_id", ASCENDING), ("status", ASCENDING)])
+    tasks.create_index([("user_id", ASCENDING), ("is_recurring", ASCENDING)])
+    tasks.create_index([("user_id", ASCENDING), ("parent_task_id", ASCENDING)])
+    tasks.create_index([("user_id", ASCENDING), ("is_generated_instance", ASCENDING), ("scheduled_time", ASCENDING)])
