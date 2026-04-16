@@ -90,3 +90,34 @@ class TaskUpdate_model(BaseModel):
 
 class EnergyLogCreate_model(BaseModel):
     energy_level: float = Field(..., ge=0.0, le=10.0)
+
+
+class AdminEnergyUpdate_model(BaseModel):
+    energy_level: float = Field(..., ge=0.0, le=10.0)
+
+
+class AdminTaskCreate_model(BaseModel):
+    title: str = Field(..., min_length=1, max_length=120)
+    description: str = Field(default="", max_length=1000)
+    scheduled_time: datetime
+    energy_cost: float = Field(..., ge=0.0, le=10.0)
+    is_recurring: bool = False
+    repeat_pattern: Optional[Literal["daily"]] = None
+
+    @field_validator("title")
+    @classmethod
+    def clean_title(cls, value: str) -> str:
+        return clean_text(value)
+
+    @field_validator("description")
+    @classmethod
+    def clean_description(cls, value: str) -> str:
+        return value.strip()
+
+    @model_validator(mode="after")
+    def validate_recurrence(self):
+        if self.is_recurring and self.repeat_pattern != "daily":
+            raise ValueError("Recurring tasks currently only support repeat_pattern='daily'")
+        if not self.is_recurring and self.repeat_pattern is not None:
+            raise ValueError("repeat_pattern requires is_recurring=True")
+        return self
