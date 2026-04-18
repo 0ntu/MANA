@@ -11,10 +11,13 @@ from app.authentication import (
     hash_password,
     make_formatted_userdata,
     validate_auth_user,
+    validate_admin_user,
 )
 from app.database import energy_logs, tasks, users
 from app.mana_engine import run_mana_engine
 from app.fastapi_models import (
+    AdminEnergyUpdate_model,
+    AdminTaskCreate_model,
     EnergyLogCreate_model,
     TaskCreate_model,
     TaskUpdate_model,
@@ -372,6 +375,128 @@ def finish_task(task_id: str, current_user: dict = Depends(validate_auth_user)):
 
     updated = tasks.find_one({"_id": ObjectId(task_id)})
     return _fmt_task(updated)
+
+
+# admin endpoints
+@router.get("/admin/users")
+def admin_list_users(admin: dict = Depends(validate_admin_user)):
+    all_users = list(users.find({}))
+    return {"users": [make_formatted_userdata(u) for u in all_users]}
+
+
+@router.get("/admin/users/{user_id}/schedule")
+def admin_get_user_schedule(user_id: str, admin: dict = Depends(validate_admin_user)):
+    if not ObjectId.is_valid(user_id):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid user ID")
+
+    target = users.find_one({"_id": ObjectId(user_id)})
+    if not target:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    user_tasks = list(tasks.find({"user_id": ObjectId(user_id)}).sort("scheduled_time", 1))
+    return {
+        "user": make_formatted_userdata(target),
+        "tasks": [_fmt_task(t) for t in user_tasks],
+    }
+
+
+@router.patch("/admin/users/{user_id}/energy")
+def admin_update_user_energy(
+    user_id: str,
+    payload: AdminEnergyUpdate_model,
+    admin: dict = Depends(validate_admin_user),
+):
+    if not ObjectId.is_valid(user_id):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid user ID")
+
+    result = users.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": {"current_energy": float(payload.energy_level)}},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    energy_logs.insert_one({
+        "user_id": ObjectId(user_id),
+        "energy_level": float(payload.energy_level),
+        "created_time": datetime.now(est),
+        "source": "admin",
+    })
+
+    updated = users.find_one({"_id": ObjectId(user_id)})
+    return make_formatted_userdata(updated)
+
+
+@router.post("/admin/users/{user_id}/tasks", status_code=status.HTTP_201_CREATED)
+def admin_create_user_task(
+    user_id: str,
+    payload: AdminTaskCreate_model,
+    admin: dict = Depends(validate_admin_user),
+):
+    if not ObjectId.is_valid(user_id):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid user ID")
+
+    if not users.find_one({"_id": ObjectId(user_id)}):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    task = {
+        "user_id": ObjectId(user_id),
+        "title": payload.title.strip(),
+        "description": payload.description.strip(),
+        "scheduled_time": payload.scheduled_time,
+        "energy_cost": float(payload.energy_cost),
+        "actual_energy_cost": None,
+        "status": "planned",
+        "created_time": datetime.now(est),
+        "updated_time": None,
+        "completed_time": None,
+        "is_recurring": bool(payload.is_recurring),
+        "repeat_pattern": payload.repeat_pattern,
+        "parent_task_id": None,
+        "is_generated_instance": False,
+    }
+    record = tasks.insert_one(task)
+    task["_id"] = record.inserted_id
+    return _fmt_task(task)
+
+
+@router.patch("/admin/tasks/{task_id}")
+def admin_update_task(
+    task_id: str,
+    payload: TaskUpdate_model,
+    admin: dict = Depends(validate_admin_user),
+):
+    if not ObjectId.is_valid(task_id):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid task ID")
+
+    updates = {k: v for k, v in payload.model_dump().items() if v is not None}
+    if not updates:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No fields to update")
+
+    if "title" in updates:
+        updates["title"] = updates["title"].strip()
+    if "description" in updates:
+        updates["description"] = updates["description"].strip()
+    if updates.get("is_recurring") is False:
+        updates["repeat_pattern"] = None
+    updates["updated_time"] = datetime.now(est)
+
+    result = tasks.update_one({"_id": ObjectId(task_id)}, {"$set": updates})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+
+    updated = tasks.find_one({"_id": ObjectId(task_id)})
+    return _fmt_task(updated)
+
+
+@router.delete("/admin/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
+def admin_delete_task(task_id: str, admin: dict = Depends(validate_admin_user)):
+    if not ObjectId.is_valid(task_id):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid task ID")
+
+    result = tasks.delete_one({"_id": ObjectId(task_id)})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
 
 
 
