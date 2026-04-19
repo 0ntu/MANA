@@ -71,14 +71,3 @@ MANA/
    ```
 
 5. Open http://localhost:8501 in your browser.
-
-## Features
-
-- Energy-aware scheduling
-- Task management
-- Dashboard with energy usage insights
-
-## Troubleshooting
-
-- If Docker fails to start, ensure ports 8501 and 8000 are not in use.
-- Check MongoDB connection settings in `docker-compose.yml` or `.env` file.
