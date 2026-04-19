@@ -276,7 +276,7 @@ def list_tasks(current_user: dict = Depends(validate_auth_user)):
         })
     )
     for template in recurring_templates:
-         og_time = template["scheduled_time"]
+        og_time = template["scheduled_time"]
         todays_scheduled_time = datetime.combine(
             now.date(),
             time(
@@ -333,7 +333,7 @@ def update_task(
     if not updates:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No fields to update")
 
-  if "title" in updates:
+    if "title" in updates:
         updates["title"] = updates["title"].strip()
     if "description" in updates:
         updates["description"] = updates["description"].strip()
