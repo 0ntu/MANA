@@ -94,7 +94,7 @@ def get_dashboard_summary(current_user: dict = Depends(validate_auth_user)):
             "user_id": current_user["_id"],
             "parent_task_id": template["_id"],
             "is_generated_instance": True,
-            "scheduled_time": {"$gte": day_starttart, "$lte": day_endnd},
+            "scheduled_time": {"$gte": day_start, "$lte": day_end},
         })
 
         if not existing_instance:
@@ -124,12 +124,12 @@ def get_dashboard_summary(current_user: dict = Depends(validate_auth_user)):
         })
     )
 
-    remaining_today_endnergy_cost = round(
+    remaining_today_energy_cost = round(
         sum(float(t.get("energy_cost", 0)) for t in remaining_today_tasks), 1
     )
     current_energy = round(float(current_user.get("current_energy", 0.0)), 1)
-    estimated_end_of_day_endnergy = round(
-        max(0.0, current_energy - remaining_today_endnergy_cost), 1
+    estimated_end_of_day_energy = round(
+        max(0.0, current_energy - remaining_today_energy_cost), 1
     )
 
     planned_tasks_count = tasks.count_documents({
@@ -143,13 +143,13 @@ def get_dashboard_summary(current_user: dict = Depends(validate_auth_user)):
 
     mana_extra = run_mana_engine(
         current_energy,
-        remaining_today_endnergy_cost,
-        estimated_end_of_day_endnergy,
+        remaining_today_energy_cost,
+        estimated_end_of_day_energy,
         remaining_today_tasks,
     )
     max_energy = 10.0
     current_energy_percent = round((current_energy / max_energy) * 100.0, 1)
-    estimated_end_energy_percent = round((estimated_end_of_day_endnergy / max_energy) * 100.0, 1)
+    estimated_end_energy_percent = round((estimated_end_of_day_energy / max_energy) * 100.0, 1)
     if current_energy <= 2.5:
         energy_bar_state = "low"
     elif current_energy <= 6.0:
@@ -159,8 +159,8 @@ def get_dashboard_summary(current_user: dict = Depends(validate_auth_user)):
         
     return {
         "current_energy": current_energy,
-        "remaining_today_endnergy_cost": remaining_today_endnergy_cost,
-        "estimated_end_of_day_endnergy": estimated_end_of_day_endnergy,
+        "remaining_today_energy_cost": remaining_today_energy_cost,
+        "estimated_end_of_day_energy": estimated_end_of_day_energy,
         "planned_tasks_count": planned_tasks_count,
         "completed_tasks_count": completed_tasks_count,
         "remaining_today_tasks_amount": len(remaining_today_tasks),
@@ -341,9 +341,6 @@ def update_task(
         {"_id": ObjectId(task_id), "user_id": current_user["_id"]},
         {"$set": updates},
     )
-    if result.matched_count == 0:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
-
     updated = tasks.find_one({"_id": ObjectId(task_id)})
     return _fmt_task(updated)
 
