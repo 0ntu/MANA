@@ -14,6 +14,11 @@ body {
 </style>
 """)
 
+# public schedule route, no auth required
+if st.query_params.get("page") == "public_schedule":
+    exec(open(APP_DIR / "views" / "public_schedule.py").read())
+    st.stop()
+
 
 def home_page():
     st.title("UF MANA")
@@ -52,6 +57,9 @@ if token and user:
         ],
         "Energy": [
             st.Page(APP_DIR / "views" / "log_mana.py", title="Log Mana", icon=":material/battery_charging_full:"),
+        ],
+        "Settings": [
+            st.Page(APP_DIR / "views" / "share_settings.py", title="Share Schedule", icon=":material/share:"),
         ],
     }
 

@@ -1,4 +1,5 @@
 #communication to the frontend requests
+import uuid
 from datetime import datetime, timezone, time, timedelta
 from zoneinfo import ZoneInfo
 from bson import ObjectId
@@ -494,6 +495,45 @@ def admin_delete_task(task_id: str, admin: dict = Depends(validate_admin_user)):
     result = tasks.delete_one({"_id": ObjectId(task_id)})
     if result.deleted_count == 0:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+
+
+# share endpoints
+@router.get("/share/status")
+def get_share_status(current_user: dict = Depends(validate_auth_user)):
+    share_token = current_user.get("share_token")
+    return {"share_token": share_token}
+
+
+@router.post("/share/generate")
+def generate_share_link(current_user: dict = Depends(validate_auth_user)):
+    new_token = str(uuid.uuid4())
+    users.update_one(
+        {"_id": current_user["_id"]},
+        {"$set": {"share_token": new_token}},
+    )
+    return {"share_token": new_token}
+
+
+@router.delete("/share/disable", status_code=status.HTTP_204_NO_CONTENT)
+def disable_share_link(current_user: dict = Depends(validate_auth_user)):
+    users.update_one(
+        {"_id": current_user["_id"]},
+        {"$unset": {"share_token": ""}},
+    )
+
+
+@router.get("/public/schedule/{share_token}")
+def get_public_schedule(share_token: str):
+    user = users.find_one({"share_token": share_token})
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Schedule not found")
+
+    user_tasks = list(tasks.find({"user_id": user["_id"]}).sort("scheduled_time", 1))
+    return {
+        "username": user["username"],
+        "current_energy": float(user.get("current_energy", 0.0)),
+        "tasks": [_fmt_task(t) for t in user_tasks],
+    }
 
 
 
