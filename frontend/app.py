@@ -55,6 +55,11 @@ if token and user:
         ],
     }
 
+    if user.get("role") == "admin":
+        pages["Admin"] = [
+            st.Page(APP_DIR / "views" / "admin_panel.py", title="Admin Panel", icon=":material/admin_panel_settings:"),
+        ]
+
     nav = st.navigation(pages)
 
     with st.sidebar:
