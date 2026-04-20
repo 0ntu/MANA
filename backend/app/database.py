@@ -31,6 +31,7 @@ def create_admin() -> None:
 
 def initialize_indexes() -> None:
     users.create_index([("username", ASCENDING)], unique=True)
+    users.create_index([("share_token", ASCENDING)], unique=True, sparse=True)
     energy_logs.create_index([("user_id", ASCENDING), ("created_time", DESCENDING)])
     tasks.create_index([("user_id", ASCENDING), ("scheduled_time", ASCENDING)])
     tasks.create_index([("user_id", ASCENDING), ("status", ASCENDING)])
