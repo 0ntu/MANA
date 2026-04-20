@@ -19,6 +19,7 @@ def make_formatted_userdata(user: dict) -> dict:
         "username": user["username"],
         "current_energy": float(user.get("current_energy", 0.0)),
         "created_time": user["created_time"].isoformat() if user.get("created_time") else None,
+        "role": user.get("role", "user"),
     }
 
 # insecure lmao lolololol
@@ -60,6 +61,16 @@ def validate_auth_user(authorization: str = Header(default="")) -> dict:
             detail="User not found",
         )
 
+    return user
+
+
+def validate_admin_user(authorization: str = Header(default="")) -> dict:
+    user = validate_auth_user(authorization)
+    if user.get("role") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not permitted",
+        )
     return user
 
 

@@ -16,104 +16,27 @@ st.markdown(
         margin: 0;
         padding: 0;
     }
-    .header {
-        background-color: #4CAF50;
-        color: white;
-        padding: 2rem 0;
-        text-align: center;
-    }
-    .header h1 {
-        font-size: 3rem;
-        margin: 0;
-    }
-    .header p {
-        font-size: 1.2rem;
-        margin: 0.5rem 0 0;
-    }
-    .features {
-        display: flex;
-        justify-content: space-around;
-        padding: 2rem 1rem;
-        background-color: #fff;
-    }
-    .feature {
-        text-align: center;
-        max-width: 300px;
-    }
-    .feature h3 {
-        font-size: 1.5rem;
-        color: #4CAF50;
-    }
-    .feature p {
-        font-size: 1rem;
-        color: #555;
-    }
-    .cta {
-        text-align: center;
-        padding: 2rem 1rem;
-        background-color: #f1f1f1;
-    }
-    .cta button {
-        background-color: #4CAF50;
-        color: white;
-        border: none;
-        padding: 0.75rem 1.5rem;
-        font-size: 1rem;
-        border-radius: 5px;
-        cursor: pointer;
-        margin: 0.5rem;
-    }
-    .cta button:hover {
-        background-color: #45a049;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
 
-def landing_page():
-    # Header Section
-    st.markdown(
-        """
-        <div class="header">
-            <h1>Energy Scheduler</h1>
-            <p>Plan your day based on your energy levels, not just your time.</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    if user.get("role") == "admin":
+        pages["Admin"] = [
+            st.Page(APP_DIR / "views" / "admin_panel.py", title="Admin Panel", icon=":material/admin_panel_settings:"),
+        ]
 
-    # Features Section
-    st.markdown(
-        """
-        <div class="features">
-            <div class="feature">
-                <h3>Track Your Energy</h3>
-                <p>Monitor your energy levels throughout the day to stay productive.</p>
-            </div>
-            <div class="feature">
-                <h3>Smart Scheduling</h3>
-                <p>Get personalized task recommendations based on your energy.</p>
-            </div>
-            <div class="feature">
-                <h3>Stay Balanced</h3>
-                <p>Avoid burnout by planning tasks that match your energy levels.</p>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    nav = st.navigation(pages)
 
-    # Call-to-Action Section
-    st.markdown(
-        """
-        <div class="cta">
-            <button onclick="location.href='#'">Sign In</button>
-            <button onclick="location.href='#'">Sign Up</button>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    with st.sidebar:
+        st.divider()
+        st.success(f"Signed in as **{user.get('username', 'User')}**")
+        if st.button("Logout", use_container_width=True):
+            logout()
+else:
+    # logged out sidebar
+    pages = [
+        st.Page(home_page, title="Home", icon=":material/home:"),
+        st.Page(APP_DIR / "views" / "login.py", title="Sign In", icon=":material/login:"),
+        st.Page(APP_DIR / "views" / "signup.py", title="Create Account", icon=":material/person_add:"),
+    ]
 
-# Render the landing page
-landing_page()
+    nav = st.navigation(pages)
+
+nav.run()

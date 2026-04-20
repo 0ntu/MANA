@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timezone
 from pymongo import MongoClient, ASCENDING, DESCENDING
 
 mongo_url = os.getenv("MONGO_URI", os.getenv("MONGO_URL", "mongodb://localhost:27017"))
@@ -9,6 +10,23 @@ database = connection[mongo_database]
 users = database["users"]
 energy_logs = database["energy_logs"]
 tasks = database["tasks"]
+
+
+def create_admin() -> None:
+    # create the admin account as it cannot be created via the signup page
+    from app.authentication import hash_password  # local import to avoid circular
+
+    admin_username = "admin"
+    admin_password = "admin" # unguessable
+
+    if not users.find_one({"role": "admin"}):
+        users.insert_one({
+            "username": admin_username,
+            "hashed_pass": hash_password(admin_password),
+            "created_time": datetime.now(timezone.utc),
+            "current_energy": 0.0,
+            "role": "admin",
+        })
 
 
 def initialize_indexes() -> None:
