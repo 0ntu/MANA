@@ -29,5 +29,4 @@ if st.button("Log Energy"):
             st.error(data.get("detail") or "Energy log failed.")
         else:
             st.success("Energy logged.")
-            st.json(data)
 
