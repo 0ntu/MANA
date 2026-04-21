@@ -57,6 +57,7 @@ if token and user:
         ],
         "Energy": [
             st.Page(APP_DIR / "views" / "log_mana.py", title="Log Mana", icon=":material/battery_charging_full:"),
+            st.Page(APP_DIR / "views" / "view_energy_graph.py", title="Energy History", icon=":material/insights:"),
         ],
         "Settings": [
             st.Page(APP_DIR / "views" / "share_settings.py", title="Share Schedule", icon=":material/share:"),

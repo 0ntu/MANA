@@ -2,3 +2,4 @@ streamlit
 streamlit-authenticator
 streamlit-calendar
 requests
+plotly
