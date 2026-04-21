@@ -1,5 +1,6 @@
 import streamlit as st
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 from services.event_service import get_tasks, finish_task
 
@@ -10,7 +11,8 @@ if not token:
 
 st.title("Today's Schedule")
 
-now = datetime.now()
+est = ZoneInfo("America/New_York")
+now = datetime.now(est)
 st.caption(f"🕐 {now.strftime('%A, %B %d • %I:%M %p')}")
 
 try:
@@ -26,8 +28,10 @@ today_tasks = []
 for task in all_tasks:
     scheduled_str = task["scheduled_time"].replace("Z", "+00:00")
     scheduled_time = datetime.fromisoformat(scheduled_str)
-    if scheduled_time.tzinfo is not None:
-        scheduled_time = scheduled_time.replace(tzinfo=None)
+    if scheduled_time.tzinfo is None:
+        scheduled_time = scheduled_time.replace(tzinfo=est)
+    else:
+        scheduled_time = scheduled_time.astimezone(est)
     if today_start <= scheduled_time <= today_end:
         task["_scheduled_dt"] = scheduled_time
         today_tasks.append(task)
