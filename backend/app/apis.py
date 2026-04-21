@@ -535,5 +535,20 @@ def get_public_schedule(share_token: str):
         "tasks": [_fmt_task(t) for t in user_tasks],
     }
 
-
+@router.get("/energy/history")
+def get_energy_history(current_user: dict = Depends(validate_auth_user)):
+    logs = list(
+        energy_logs.find(
+            {"user_id": current_user["_id"]},
+        ).sort("created_time", 1).limit(100)
+    )
+    return {
+        "history": [
+            {
+                "energy_level": float(log["energy_level"]),
+                "created_time": log["created_time"].isoformat(),
+            }
+            for log in logs
+        ]
+    }
 
