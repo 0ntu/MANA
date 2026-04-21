@@ -9,18 +9,22 @@ services:
     volumes:
       - mongodb_data:/data/db
     restart: always
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   backend:
     build: ./backend
     container_name: mana-backend
     ports:
       - "8000:8000"
-    volumes:
-      - ./backend/app:/app/app
     environment:
       - MONGO_URI=mongodb://mongodb:27017/mana
     depends_on:
-      - mongodb
+      mongodb:
+        condition: service_healthy
     restart: always
 
   frontend:
@@ -28,8 +32,6 @@ services:
     container_name: mana-frontend
     ports:
       - "8501:8501"
-    volumes:
-      - ./frontend:/app
     depends_on:
       - backend
     environment:

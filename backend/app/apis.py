@@ -289,7 +289,7 @@ def list_tasks(current_user: dict = Depends(validate_auth_user)):
         )
         if todays_scheduled_time < og_time:
             continue
-            
+
         past = tasks.find_one({
             "user_id": current_user["_id"],
             "parent_task_id": template["_id"],
