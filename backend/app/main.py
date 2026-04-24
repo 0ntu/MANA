@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
 from app.apis import router
-from app.database import initialize_indexes, create_admin
+from app.database import initialize_indexes, create_admin, seed_dummy_data
 
 app = FastAPI(title="UF MANA API")
 
@@ -12,6 +12,7 @@ app.include_router(router)
 def on_startup():
     initialize_indexes()
     create_admin()
+    seed_dummy_data()
 
 
 @app.get("/")
